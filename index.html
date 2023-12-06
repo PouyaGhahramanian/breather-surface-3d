@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breather Surface Visualization</title>
+    <style>
+        body { margin: 0; }
+        canvas { width: 100%; height: 100%; display: block; }
+    </style>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+      <div id="leftPanel" class="side-panel">
+      <div id="buttonsPanel" class="file-panel">
+          <h2>Modifiers</h2>
+          <!-- Buttons with icons -->
+          <button id="wireframeBotton" onclick="" class="tool-button">Wireframe</button>
+          <button id="gouraudButton" onclick="" class="tool-button">Gouraud</button>
+          <button id="phongButton" onclick="" class="tool-button">Phong</button>
+          <button id="mappingBotton" onclick="" class="tool-button">Mapping</button>
+          <button id="resetBotton" onclick="" class="tool-button"><i class="fas fa-undo"></i></button>
+      </div>
+    </div>
+      <canvas id="glcanvas" width="900" height="900"></canvas>
+
+      <div id="slidersPanel" class="side-panel">
+          <div class="tool-section">
+              <h2>Parameters</h2>
+              <!-- Sliders for setting the parameters -->
+              <label for="aa-range">aa: <span id="aa-value">0.4</span> </label>
+              <input type="range" id="aa-range" min="0" max="1" step="0.01" value="0.4">
+
+              <label for="u-min-range">uRange Min: <span id="u-min-value">-14</span> </label>
+              <input type="range" id="u-min-range" min="-50" max="0" value="-14">
+              <label for="u-max-range">uRange Max: <span id="u-max-value">14</span> </label>
+              <input type="range" id="u-max-range" min="0" max="50" value="14"><br>
+
+              <label for="v-min-range">vRange Min: <span id="v-min-value">-37</span> </label>
+              <input type="range" id="v-min-range" min="-50" max="0" value="-37">
+              <label for="v-max-range">vRange Max: <span id="v-max-value">37</span> </label>
+              <input type="range" id="v-max-range" min="0" max="50" value="37"><br>
+
+              <label for="u-segments-range">uSegments: <span id="u-segments-value">30</span> </label>
+              <input type="range" id="u-segments-range" min="10" max="200" value="30">
+              <label for="v-segments-range">vSegments: <span id="v-segments-value">-30</span> </label>
+              <input type="range" id="v-segments-range" min="10" max="600" value="30"><br>
+
+            </div>
+        </div>
+    </div>
+    <!-- <canvas id="glcanvas"></canvas> -->
+    <script src="gl-matrix-min.js"></script>
+    <script src="breather.js"></script>
+</body>
+</html>
