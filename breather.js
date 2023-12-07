@@ -13,7 +13,48 @@ function main() {
     // Clear the color buffer with specified clear color
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    const vsSource = `
+    let shadingMode = 'default' // default, wireframe, gouraud, phong
+
+    const vsSource_default = `
+      // Default Vertex Shader Code
+      attribute vec3 aVertexPosition;
+      attribute vec3 aVertexNormal;
+
+      uniform mat4 uModelViewMatrix;
+      uniform mat4 uProjectionMatrix;
+      uniform mat3 uNormalMatrix;
+
+      uniform vec3 ambientLight;
+      uniform vec3 directionalLightColor;
+      uniform vec3 directionalVector;
+
+      varying highp vec3 vLighting;
+
+      void main(void) {
+          gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
+
+          // Transform the normal to view space
+          highp vec3 transformedNormal = normalize(uNormalMatrix * aVertexNormal);
+
+          // Calculate lighting effect
+          highp vec3 ambient = ambientLight;
+          highp vec3 directionalLight = normalize(directionalVector);
+          highp float directional = max(dot(transformedNormal, directionalLight), 0.0);
+          vLighting = ambient + (directionalLightColor * directional);
+      }
+      `;
+
+    const fsSource_default = `
+      // Default Fragment Shader Code
+      varying highp vec3 vLighting;
+
+      void main(void) {
+          highp vec3 color = vec3(0.0, 0.2, 0.6); // White color, you can change this based on your assignment needs
+          gl_FragColor = vec4(color * vLighting, 1.0);
+      }
+      `;
+
+    const vsSource_wireframe = `
       // Vertex Shader Code
       attribute vec3 aVertexPosition;
       attribute vec3 aVertexNormal;
@@ -42,7 +83,7 @@ function main() {
       }
       `;
 
-    const fsSource = `
+    const fsSource_wireframe = `
       // Fragment Shader Code
       varying highp vec3 vLighting;
 
@@ -51,16 +92,128 @@ function main() {
           gl_FragColor = vec4(color * vLighting, 1.0);
       }
       `;
+
+    const vsSource_gouraud = `
+        // Vertex Shader for Gouraud Shading
+        attribute vec3 aVertexPosition;
+        attribute vec3 aVertexNormal;
+
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
+        uniform mat3 uNormalMatrix;
+
+        uniform vec3 ambientLight;
+        uniform vec3 directionalLightColor;
+        uniform vec3 directionalVector;
+        uniform vec3 uMaterialAmbient;
+        uniform vec3 uMaterialDiffuse;
+        uniform vec3 uMaterialSpecular;
+        uniform float uMaterialShininess;
+
+        varying highp vec3 vColor;
+
+        void main(void) {
+            gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
+
+            // Transform the normal to view space and calculate lighting
+            highp vec3 transformedNormal = normalize(uNormalMatrix * aVertexNormal);
+            highp vec3 directionalLight = normalize(directionalVector);
+
+            // Ambient component
+            highp vec3 ambient = ambientLight * uMaterialAmbient;
+
+            // Diffuse component
+            highp float diff = max(dot(transformedNormal, directionalLight), 0.0);
+            highp vec3 diffuse = directionalLightColor * (diff * uMaterialDiffuse);
+
+            // Specular component (optional for Gouraud shading)
+            highp vec3 viewDir = normalize(-gl_Position.xyz);
+            highp vec3 reflectDir = reflect(-directionalLight, transformedNormal);
+            highp float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
+            highp vec3 specular = directionalLightColor * (spec * uMaterialSpecular);
+
+            vColor = ambient + diffuse; // + specular; // Uncomment if including specular component
+        }
+    `;
+
+    const fsSource_gouraud = `
+      // Fragment Shader for Gouraud Shading
+      precision highp float;
+      varying highp vec3 vColor;
+
+      void main(void) {
+          gl_FragColor = vec4(vColor, 1.0);
+      }
+      `;
+
+    const vsSource_phong = `
+        attribute vec3 aVertexPosition;
+        attribute vec3 aVertexNormal;
+
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
+        uniform mat3 uNormalMatrix;
+
+        varying highp vec3 vNormal;
+        varying highp vec3 vPosition;
+
+        void main(void) {
+            vPosition = vec3(uModelViewMatrix * vec4(aVertexPosition, 1.0));
+            vNormal = uNormalMatrix * aVertexNormal;
+
+            gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
+        }
+    `;
+
+    const fsSource_phong = `
+      precision highp float;
+
+      varying highp vec3 vNormal;
+      varying highp vec3 vPosition;
+
+      uniform vec3 ambientLight;
+      uniform vec3 directionalLightColor;
+      uniform vec3 directionalVector;
+      uniform vec3 uMaterialAmbient;
+      uniform vec3 uMaterialDiffuse;
+      uniform vec3 uMaterialSpecular;
+      uniform float uMaterialShininess;
+
+      void main(void) {
+          highp vec3 normal = normalize(vNormal);
+          highp vec3 lightDir = normalize(directionalVector - vPosition);
+          highp vec3 viewDir = normalize(-vPosition);
+          highp vec3 reflectDir = reflect(-lightDir, normal);
+
+          // Ambient component
+          highp vec3 ambient = ambientLight * uMaterialAmbient;
+
+          // Diffuse component
+          highp float diff = max(dot(normal, lightDir), 0.0);
+          highp vec3 diffuse = directionalLightColor * (diff * uMaterialDiffuse);
+
+          // Specular component
+          highp float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
+          highp vec3 specular = directionalLightColor * (spec * uMaterialSpecular);
+
+          highp vec3 finalColor = ambient + diffuse + specular;
+          gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    let vsSource = vsSource_default;
+    let fsSource = fsSource_default;
+
     // Define the shaders
-    const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-    const programInfo = initProgramInfo(gl, shaderProgram);
+    let shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    let programInfo = initProgramInfo(gl, shaderProgram);
 
     // Parameters for generating Breather surface
     let aa = 0.4;
     let uRange = { min: -14, max: 14 };
     let vRange = { min: -37, max: 37 };
-    let uSegments = 30;
-    let vSegments = 30;
+    let uSegments = 100;
+    let vSegments = 300;
     let data = generateBreatherSurface(aa, uRange, vRange, uSegments, vSegments); // Increase segments for higher resolution
 
     let buffers = initBuffers(gl, data);
@@ -72,11 +225,84 @@ function main() {
     let lastMouseY = null;
     let rotationMatrix = glMatrix.mat4.create();
 
+    let material = {
+        ambient: [0.3, 0.3, 0.5], // Ambient color
+        diffuse: [0.0, 0.0, 1.0], // Diffuse color
+        specular: [0.6, 0.6, 0.6], // Specular color
+        shininess: 64.0 // Shininess factor
+    };
+
     function regenerateSurface() {
         data = generateBreatherSurface(aa, uRange, vRange, uSegments, vSegments);
         buffers = initBuffers(gl, data);
         // render();
     }
+
+    function setActiveButton(buttonId) {
+        const toolButtons = document.querySelectorAll('.tool-button');
+        toolButtons.forEach(button => {
+            button.classList.remove('active');
+        });
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.classList.add('active');
+        }
+    }
+
+    setActiveButton('defaultShadingButton');
+
+    function changeShaders(event){
+        switch (shadingMode) {
+            case 'default':
+                shaderProgram = initShaderProgram(gl, vsSource_default, fsSource_default);
+                programInfo = initProgramInfo(gl, shaderProgram);
+                break;
+            case 'wireframe':
+                shaderProgram = initShaderProgram(gl, vsSource_wireframe, fsSource_wireframe);
+                programInfo = initProgramInfo(gl, shaderProgram);
+                break;
+            case 'gouraud':
+                shaderProgram = initShaderProgram(gl, vsSource_gouraud, fsSource_gouraud);
+                programInfo = initProgramInfo(gl, shaderProgram);
+                break;
+            case 'phong':
+                shaderProgram = initShaderProgram(gl, vsSource_phong, fsSource_phong);
+                programInfo = initProgramInfo(gl, shaderProgram);
+                break;
+            default:
+                shaderProgram = initShaderProgram(gl, vsSource_default, fsSource_default);
+                programInfo = initProgramInfo(gl, shaderProgram);
+                break;
+            }
+        }
+
+    // Event listeners for shading modes and mapping
+    // Event listener for the Default button
+    document.getElementById('defaultShadingButton').addEventListener('click', function() {
+        shadingMode = 'default';
+        setActiveButton('defaultShadingButton');
+        changeShaders();
+    });
+    // Event listener for the Wireframe button
+    document.getElementById('wireframeButton').addEventListener('click', function() {
+        shadingMode = 'wireframe';
+        setActiveButton('wireframeButton');
+        changeShaders();
+    });
+
+    // Event listener for the Gouraud Shading button
+    document.getElementById('gouraudButton').addEventListener('click', function() {
+        shadingMode = 'gouraud';
+        setActiveButton('gouraudButton');
+        changeShaders();
+    });
+
+    // Event listener for the Phong Shading button
+    document.getElementById('phongButton').addEventListener('click', function() {
+        shadingMode = 'phong';
+        setActiveButton('phongButton');
+        changeShaders();
+    });
 
     // Event listeners for the parameters
     document.getElementById('aa-range').addEventListener('input', function(event) {
@@ -122,13 +348,13 @@ function main() {
     });
 
     // Event listener for reseting the parameter values
-    document.getElementById('resetBotton').addEventListener('click', function() {
+    document.getElementById('resetButton').addEventListener('click', function() {
         // Reset parameters to their default values
         aa = 0.4;
         uRange = { min: -14, max: 14 };
         vRange = { min: -37, max: 37 };
-        uSegments = 30;
-        vSegments = 30;
+        uSegments = 100;
+        vSegments = 300;
 
         // Update the slider positions and displayed values
         document.getElementById('aa-range').value = aa;
@@ -245,10 +471,14 @@ function main() {
                 projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
                 modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
                 normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
-                // Add additional uniforms like lighting and material properties here
                 ambientLight: gl.getUniformLocation(shaderProgram, 'ambientLight'),
                 directionalLightColor: gl.getUniformLocation(shaderProgram, 'directionalLightColor'),
                 directionalVector: gl.getUniformLocation(shaderProgram, 'directionalVector'),
+                // Material related uniforms
+                materialAmbient: gl.getUniformLocation(shaderProgram, 'uMaterialAmbient'),
+                materialDiffuse: gl.getUniformLocation(shaderProgram, 'uMaterialDiffuse'),
+                materialSpecular: gl.getUniformLocation(shaderProgram, 'uMaterialSpecular'),
+                materialShininess: gl.getUniformLocation(shaderProgram, 'uMaterialShininess'),
             },
         };
     }
@@ -418,29 +648,17 @@ function main() {
         // Tell WebGL to use our program when drawing
         gl.useProgram(programInfo.program);
 
-        // Set the shader uniforms
-        gl.uniformMatrix4fv(
-            programInfo.uniformLocations.projectionMatrix,
-            false,
-            camera.projectionMatrix);
-        gl.uniformMatrix4fv(
-            programInfo.uniformLocations.modelViewMatrix,
-            false,
-            modelViewMatrix);
+        // Set the shader uniforms common to all shading modes
+        gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, camera.projectionMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
 
-        // Compute the normal matrix from the model-view matrix
+        // Compute and set the normal matrix
         const normalMatrix = glMatrix.mat3.create();
         glMatrix.mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-
-        // Pass the normal matrix to the shader
-        gl.uniformMatrix3fv(
-            programInfo.uniformLocations.normalMatrix,
-            false,
-            normalMatrix
-        );
+        gl.uniformMatrix3fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
 
         // Set the lighting uniforms
-        const ambientLightUniformValue = [0.3, 0.3, 0.3];
+        const ambientLightUniformValue = [0.6, 0.6, 0.6];
         const directionalLightColorUniformValue = [1, 1, 1];
         const directionalVectorUniformValue = [0.85, 0.8, 0.75];
 
@@ -448,19 +666,53 @@ function main() {
         gl.uniform3fv(programInfo.uniformLocations.directionalLightColor, directionalLightColorUniformValue);
         gl.uniform3fv(programInfo.uniformLocations.directionalVector, directionalVectorUniformValue);
 
+        // Set lighting uniforms if the shading mode requires them
+        if (shadingMode === 'gouraud' || shadingMode === 'phong') {
+            // gl.uniform3fv(programInfo.uniformLocations.ambientLight, ambientLightUniformValue);
+            gl.uniform3fv(programInfo.uniformLocations.directionalLightColor, directionalLightColorUniformValue);
+            gl.uniform3fv(programInfo.uniformLocations.directionalVector, directionalVectorUniformValue);
+            gl.uniform3fv(programInfo.uniformLocations.materialAmbient, material.ambient);
+            gl.uniform3fv(programInfo.uniformLocations.materialDiffuse, material.diffuse);
+            gl.uniform3fv(programInfo.uniformLocations.materialSpecular, material.specular);
+            gl.uniform1f(programInfo.uniformLocations.materialShininess, material.shininess);
+        }
+
         // Draw the elements
         const vertexCount = data.indices.length; // Use the length directly
         const type = gl.UNSIGNED_SHORT;
         const offset = 0;
-        gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+        // gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+
+        // Determine how to draw based on the shading mode
+        switch (shadingMode) {
+            case 'wireframe':
+                // For wireframe mode, use LINES (this might not give a perfect wireframe for complex models)
+                gl.drawElements(gl.LINES, vertexCount, type, offset);
+                break;
+            case 'default':
+            case 'gouraud':
+            case 'phong':
+            default:
+                // For other shading modes, use TRIANGLES
+                gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+                break;
+        }
     }
 
     function render() {
         camera = initCamera(gl);
         gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+        // Enable vertex normals attribute if needed for the current shading mode
+        if (shadingMode === 'gouraud' || shadingMode === 'phong') {
+            gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+        }
         requestAnimationFrame(render);
         drawScene(gl, programInfo, buffers, camera);
         gl.disableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+        // Disable vertex normals attribute if it was enabled
+        if (shadingMode === 'gouraud' || shadingMode === 'phong') {
+            gl.disableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+        }
     }
 
     // Start rendering

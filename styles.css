@@ -73,7 +73,28 @@ body {
     border-bottom: 1px solid #ccc;
 }
 
-.color-button, .tool-button {
+.reset-button{
+  width: 100px;
+  height: 100px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-bottom: 20px;
+  margin-left: 40px;
+  font-weight: bold;
+  font-size: 16px;
+  background-color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reset-button:hover {
+    background-color: #ff3333;
+}
+
+.tool-button {
     width: 100px;
     height: 100px;
     border: none;
@@ -83,13 +104,22 @@ body {
     margin-bottom: 20px;
     font-weight: bold;
     font-size: 16px;
+    background-color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.color-button.active {
-    border: 4px solid #000;
-}
-
-.tool-button {
+.mapping-button {
+    width: 100px;
+    height: 100px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-bottom: 20px;
+    font-weight: bold;
+    font-size: 16px;
     background-color: white;
     display: flex;
     align-items: center;
@@ -101,34 +131,27 @@ body {
     border: 2px solid #000;
 }
 
-.color-button.red {
-    background-color: red;
-}
-
-.color-button.green {
-    background-color: green;
-}
-
-.color-button.blue {
-    background-color: blue;
-}
-
-.color-button.yellow {
-    background-color: yellow;
-}
-
-.color-button.cyan {
-    background-color: cyan;
-}
-
-.color-button.magenta {
-    background-color: magenta;
-}
-
 .tool-button:hover {
     background-color: #f0f0f0;
 }
 
 .tool-button i {
+    font-size: 32px;
+}
+
+.mapping-button.active {
+    background-color: #f0f0f0;
+    border: 2px solid #000;
+}
+
+.mapping-button:hover {
+    background-color: #f0f0f0;
+}
+
+.mapping-button i {
+    font-size: 32px;
+}
+
+.reset-button i {
     font-size: 32px;
 }

@@ -15,13 +15,13 @@
     <div class="container">
       <div id="leftPanel" class="side-panel">
       <div id="buttonsPanel" class="file-panel">
-          <h2>Modifiers</h2>
+          <h2>Options</h2>
           <!-- Buttons with icons -->
-          <button id="wireframeBotton" onclick="" class="tool-button">Wireframe</button>
+          <button id="defaultShadingButton" onclick="" class="tool-button">Default Shading</button>
+          <button id="wireframeButton" onclick="" class="tool-button">Wireframe</button>
           <button id="gouraudButton" onclick="" class="tool-button">Gouraud</button>
           <button id="phongButton" onclick="" class="tool-button">Phong</button>
-          <button id="mappingBotton" onclick="" class="tool-button">Mapping</button>
-          <button id="resetBotton" onclick="" class="tool-button"><i class="fas fa-undo"></i></button>
+          <button id="mappingButton" onclick="" class="mapping-button">Toggle Mapping</button>
       </div>
     </div>
       <canvas id="glcanvas" width="900" height="900"></canvas>
@@ -30,7 +30,7 @@
           <div class="tool-section">
               <h2>Parameters</h2>
               <!-- Sliders for setting the parameters -->
-              <label for="aa-range">aa: <span id="aa-value">0.4</span> </label>
+              <label for="aa-range">aa: <span id="aa-value">0.40</span> </label>
               <input type="range" id="aa-range" min="0" max="1" step="0.01" value="0.4">
 
               <label for="u-min-range">uRange Min: <span id="u-min-value">-14</span> </label>
@@ -43,11 +43,11 @@
               <label for="v-max-range">vRange Max: <span id="v-max-value">37</span> </label>
               <input type="range" id="v-max-range" min="0" max="50" value="37"><br>
 
-              <label for="u-segments-range">uSegments: <span id="u-segments-value">30</span> </label>
-              <input type="range" id="u-segments-range" min="10" max="200" value="30">
-              <label for="v-segments-range">vSegments: <span id="v-segments-value">-30</span> </label>
-              <input type="range" id="v-segments-range" min="10" max="600" value="30"><br>
-
+              <label for="u-segments-range">uSegments: <span id="u-segments-value">100</span> </label>
+              <input type="range" id="u-segments-range" min="10" max="200" value="100">
+              <label for="v-segments-range">vSegments: <span id="v-segments-value">300</span> </label>
+              <input type="range" id="v-segments-range" min="10" max="600" value="300"><br>
+              <button id="resetButton" onclick="" class="reset-button"><i class="fas fa-undo"></i></button>
             </div>
         </div>
     </div>
