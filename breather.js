@@ -30,6 +30,10 @@ function main() {
 
       varying highp vec3 vLighting;
 
+      // For parametric texture mapping
+      attribute vec2 aTextureCoord;
+      varying highp vec2 vTextureCoord;
+
       void main(void) {
           gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
 
@@ -41,16 +45,26 @@ function main() {
           highp vec3 directionalLight = normalize(directionalVector);
           highp float directional = max(dot(transformedNormal, directionalLight), 0.0);
           vLighting = ambient + (directionalLightColor * directional);
+
+          vTextureCoord = aTextureCoord;
       }
       `;
 
     const fsSource_default = `
       // Default Fragment Shader Code
       varying highp vec3 vLighting;
+      precision mediump float;
+
+      // The texture sampler
+      uniform sampler2D uSampler;
+
+      // The texture coordinates passed from the vertex shader.
+      varying highp vec2 vTextureCoord;
 
       void main(void) {
-          highp vec3 color = vec3(0.0, 0.2, 0.6); // White color, you can change this based on your assignment needs
-          gl_FragColor = vec4(color * vLighting, 1.0);
+          highp vec3 color = vec3(0.0, 0.2, 0.6);
+          highp vec4 textureColor = texture2D(uSampler, vTextureCoord);
+          gl_FragColor = vec4(color * vLighting, 1.0) * textureColor;
       }
       `;
 
@@ -97,6 +111,7 @@ function main() {
         // Vertex Shader for Gouraud Shading
         attribute vec3 aVertexPosition;
         attribute vec3 aVertexNormal;
+        attribute vec2 aTextureCoord;
 
         uniform mat4 uModelViewMatrix;
         uniform mat4 uProjectionMatrix;
@@ -111,6 +126,7 @@ function main() {
         uniform float uMaterialShininess;
 
         varying highp vec3 vColor;
+        varying highp vec2 vTextureCoord;
 
         void main(void) {
             gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
@@ -132,23 +148,32 @@ function main() {
             highp float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
             highp vec3 specular = directionalLightColor * (spec * uMaterialSpecular);
 
-            vColor = ambient + diffuse; // + specular; // Uncomment if including specular component
+            // vColor = ambient + diffuse; // + specular; // Uncomment if including specular component
+            vColor = ambient + diffuse + specular;
+            vTextureCoord = aTextureCoord;
         }
-    `;
+        `;
 
     const fsSource_gouraud = `
       // Fragment Shader for Gouraud Shading
       precision highp float;
+
       varying highp vec3 vColor;
+      varying highp vec2 vTextureCoord;
+
+      uniform sampler2D uSampler; // Texture sampler
 
       void main(void) {
-          gl_FragColor = vec4(vColor, 1.0);
+          // gl_FragColor = vec4(vColor, 1.0);
+          highp vec4 textureColor = texture2D(uSampler, vTextureCoord);
+          gl_FragColor = vec4(vColor, 1.0) * textureColor; // Combine color with texture
       }
       `;
 
     const vsSource_phong = `
         attribute vec3 aVertexPosition;
         attribute vec3 aVertexNormal;
+        attribute vec2 aTextureCoord;
 
         uniform mat4 uModelViewMatrix;
         uniform mat4 uProjectionMatrix;
@@ -156,20 +181,23 @@ function main() {
 
         varying highp vec3 vNormal;
         varying highp vec3 vPosition;
+        varying highp vec2 vTextureCoord;
 
         void main(void) {
             vPosition = vec3(uModelViewMatrix * vec4(aVertexPosition, 1.0));
             vNormal = uNormalMatrix * aVertexNormal;
+            vTextureCoord = aTextureCoord;
 
             gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
         }
-    `;
+        `;
 
     const fsSource_phong = `
       precision highp float;
 
       varying highp vec3 vNormal;
       varying highp vec3 vPosition;
+      varying highp vec2 vTextureCoord;
 
       uniform vec3 ambientLight;
       uniform vec3 directionalLightColor;
@@ -178,6 +206,7 @@ function main() {
       uniform vec3 uMaterialDiffuse;
       uniform vec3 uMaterialSpecular;
       uniform float uMaterialShininess;
+      uniform sampler2D uSampler;
 
       void main(void) {
           highp vec3 normal = normalize(vNormal);
@@ -196,10 +225,11 @@ function main() {
           highp float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
           highp vec3 specular = directionalLightColor * (spec * uMaterialSpecular);
 
+          highp vec4 textureColor = texture2D(uSampler, vTextureCoord);
           highp vec3 finalColor = ambient + diffuse + specular;
-          gl_FragColor = vec4(finalColor, 1.0);
+          gl_FragColor = vec4(finalColor, 1.0) * textureColor; // Combine color with texture
       }
-    `;
+      `;
 
     let vsSource = vsSource_default;
     let fsSource = fsSource_default;
@@ -226,11 +256,50 @@ function main() {
     let rotationMatrix = glMatrix.mat4.create();
 
     let material = {
-        ambient: [0.3, 0.3, 0.5], // Ambient color
-        diffuse: [0.0, 0.0, 1.0], // Diffuse color
+        ambient: [1.0, 1.0, 1.0], // Ambient color
+        diffuse: [0.6, 0.6, 0.6], // Diffuse color
         specular: [0.6, 0.6, 0.6], // Specular color
         shininess: 64.0 // Shininess factor
     };
+    let isMappingEnabled = false;
+
+    function loadTexture(gl, url) {
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        // Fill the texture with a 1x1 blue pixel.
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+
+        // Load an image and set the texture.
+        const image = new Image();
+        image.onload = function() {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+            // WebGL1 has different requirements for power of 2 images
+            // vs non power of 2 images so check if the image is a
+            // power of 2 in both dimensions.
+            if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+               // Yes, it's a power of 2. Generate mips.
+               gl.generateMipmap(gl.TEXTURE_2D);
+            } else {
+               // No, it's not a power of 2. Turn of mips and set
+               // wrapping to clamp to edge
+               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+        };
+        image.src = url;
+
+        return texture;
+    }
+
+    function isPowerOf2(value) {
+        return (value & (value - 1)) == 0;
+    }
+
+    const texture = loadTexture(gl, 'texture1.jpg');
 
     function regenerateSurface() {
         data = generateBreatherSurface(aa, uRange, vRange, uSegments, vSegments);
@@ -275,6 +344,20 @@ function main() {
                 break;
             }
         }
+
+    // Event listener for toggleMapping button
+    document.getElementById('mappingButton').addEventListener('click', function() {
+        isMappingEnabled = !isMappingEnabled; // Toggle the flag
+        const button = document.getElementById('mappingButton');
+        if (button) {
+          if(isMappingEnabled){
+            button.classList.add('active');
+          }
+          else {
+            button.classList.remove('active');
+          }
+        }
+    });
 
     // Event listeners for shading modes and mapping
     // Event listener for the Default button
@@ -466,6 +549,7 @@ function main() {
             attribLocations: {
                 vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
                 vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
+                textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
             },
             uniformLocations: {
                 projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
@@ -479,6 +563,8 @@ function main() {
                 materialDiffuse: gl.getUniformLocation(shaderProgram, 'uMaterialDiffuse'),
                 materialSpecular: gl.getUniformLocation(shaderProgram, 'uMaterialSpecular'),
                 materialShininess: gl.getUniformLocation(shaderProgram, 'uMaterialShininess'),
+                // For Texture Mapping
+                uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
             },
         };
     }
@@ -500,6 +586,7 @@ function main() {
         const positions = [];
         const normals = [];
         const indices = [];
+        const textureCoords = [];
 
         const du = (uRange.max - uRange.min) / uSegments;
         const dv = (vRange.max - vRange.min) / vSegments;
@@ -530,6 +617,11 @@ function main() {
                 nz /= len;
 
                 normals.push(nx, ny, nz);
+
+                // Calculate texture coordinates
+                let uCoord = i / uSegments;
+                let vCoord = j / vSegments;
+                textureCoords.push(uCoord, vCoord);
             }
         }
 
@@ -545,7 +637,8 @@ function main() {
         return {
             positions,
             normals,
-            indices
+            indices,
+            textureCoords
         };
     }
 
@@ -565,10 +658,16 @@ function main() {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data.indices), gl.STATIC_DRAW);
 
+        // Create a buffer for the texture coordinates
+        const textureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data.textureCoords), gl.STATIC_DRAW); // Ensure data.textureCoords is defined and contains your texture coordinates
+
         return {
             position: positionBuffer,
             normal: normalBuffer,
-            indices: indexBuffer
+            indices: indexBuffer,
+            textureCoord: textureCoordBuffer
         };
     }
 
@@ -648,6 +747,31 @@ function main() {
         // Tell WebGL to use our program when drawing
         gl.useProgram(programInfo.program);
 
+
+        if (programInfo.attribLocations.textureCoord !== -1) {
+            if (isMappingEnabled && shadingMode !== 'wireframe') {
+                // Bind the texture
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+
+                // Bind the texture coordinate buffer.
+                gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
+                gl.vertexAttribPointer(
+                    programInfo.attribLocations.textureCoord,
+                    2, // each coordinate is 2 values (u, v)
+                    gl.FLOAT,
+                    false,
+                    0,
+                    0
+                );
+                gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
+            }
+            else {
+                gl.disableVertexAttribArray(programInfo.attribLocations.textureCoord);
+                }
+            }
+
         // Set the shader uniforms common to all shading modes
         gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, camera.projectionMatrix);
         gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
@@ -658,7 +782,7 @@ function main() {
         gl.uniformMatrix3fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
 
         // Set the lighting uniforms
-        const ambientLightUniformValue = [0.6, 0.6, 0.6];
+        const ambientLightUniformValue = [1.0, 1.0, 1.0];
         const directionalLightColorUniformValue = [1, 1, 1];
         const directionalVectorUniformValue = [0.85, 0.8, 0.75];
 
@@ -701,17 +825,20 @@ function main() {
 
     function render() {
         camera = initCamera(gl);
+
         gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-        // Enable vertex normals attribute if needed for the current shading mode
-        if (shadingMode === 'gouraud' || shadingMode === 'phong') {
+        if (shadingMode === 'gouraud' || shadingMode === 'phong' || (shadingMode === 'default' && isMappingEnabled)) {
             gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+            gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
         }
+
         requestAnimationFrame(render);
         drawScene(gl, programInfo, buffers, camera);
+
         gl.disableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-        // Disable vertex normals attribute if it was enabled
-        if (shadingMode === 'gouraud' || shadingMode === 'phong') {
+        if (shadingMode === 'gouraud' || shadingMode === 'phong' || (shadingMode === 'default' && isMappingEnabled)) {
             gl.disableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+            gl.disableVertexAttribArray(programInfo.attribLocations.textureCoord);
         }
     }
 
